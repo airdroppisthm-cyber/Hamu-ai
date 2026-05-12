@@ -1333,16 +1333,7 @@ Memory context will be injected before each message in the format:
       // Prepare messages for API (handle vision support)
       const apiMessages = [
         systemMessage,
-        ...messages.map(msg => {
-          let content = msg.content;
-          // If it was a vision message, it might be an array already
-          if (Array.isArray(content)) {
-            return { role: msg.role, content: content };
-          }
-          // If it's a string that contains a base64 image (older format or display content)
-          // we should have ideally saved it as an array, but let's be safe.
-          return { role: msg.role, content: content };
-        })
+        ...messages.map(msg => ({ role: msg.role, content: msg.content }))
       ];
 
       // Call OpenRouter API
