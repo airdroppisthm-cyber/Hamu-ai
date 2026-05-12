@@ -8,7 +8,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>IAMAIHM</title>
-  <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=DM+Sans:wght@400;500&family=JetBrains+Mono&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -39,6 +38,7 @@
       background-color: var(--bg-primary);
       color: var(--text-primary);
       min-height: 100vh;
+      min-height: 100dvh;
       overflow: hidden;
       position: relative;
     }
@@ -49,6 +49,7 @@
       justify-content: center;
       align-items: center;
       height: 100vh;
+      height: 100dvh;
       background-color: var(--bg-primary);
       position: fixed;
       top: 0;
@@ -73,6 +74,7 @@
       padding: 2rem;
       text-align: center;
       height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -106,6 +108,7 @@
     /* Main App */
     #app {
       height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       position: fixed;
@@ -238,6 +241,7 @@
     /* Voice Call Screen */
     #voice-call-screen {
       height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -347,6 +351,44 @@
       40% { transform: scale(1); }
     }
 
+    /* Code Blocks */
+    .code-block-container {
+      background-color: var(--bg-secondary);
+      border-radius: 8px;
+      margin: 1rem 0;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .code-header {
+      background-color: var(--border);
+      padding: 0.4rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--text-secondary);
+      color: var(--text-secondary);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.7rem;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover {
+      background-color: var(--accent);
+      color: var(--bg-primary);
+      border-color: var(--accent);
+    }
+    .math-block {
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+
     /* File Preview */
     #file-preview {
       position: fixed;
@@ -406,8 +448,11 @@
     <!-- Top Bar -->
     <header class="top-bar">
       <div class="logo">IAMAIHM</div>
-      <button id="call-btn" class="icon-btn" title="Voice Call">📞</button>
-      <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+      <div class="top-bar-btns">
+        <button id="stop-speech-btn" class="icon-btn hidden" title="Stop Speaking">⏹️</button>
+        <button id="call-btn" class="icon-btn" title="Voice Call">📞</button>
+        <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+      </div>
     </header>
 
     <!-- Chat Area -->
@@ -465,8 +510,19 @@
         <option value="ur-PK">Urdu (Pakistan)</option>
       </select>
     </div>
+    <div class="setting-item">
+      <label for="model-select">AI Model</label>
+      <select id="model-select">
+        <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+        <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+        <option value="google/gemini-flash-1.5">Gemini Flash 1.5</option>
+        <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B</option>
+        <option value="mistralai/mistral-7b-instruct">Mistral 7B</option>
+      </select>
+    </div>
     <button id="reset-api-key">Reset API Key</button>
     <button id="export-memory">Export Memory</button>
+    <button id="import-memory">Import Memory</button>
     <button id="clear-memory">Clear Memory</button>
     <button id="close-settings">Close</button>
   </div>
@@ -510,6 +566,7 @@
     const voiceBtn = document.getElementById('voice-btn');
     const attachBtn = document.getElementById('attach-btn');
     const callBtn = document.getElementById('call-btn');
+    const stopSpeechBtn = document.getElementById('stop-speech-btn');
     const settingsBtn = document.getElementById('settings-btn');
     const endCallBtn = document.getElementById('end-call-btn');
     const installBtn = document.getElementById('install-btn');
@@ -525,8 +582,10 @@
     const voiceResponseToggle = document.getElementById('voice-response-toggle');
     const themeSelect = document.getElementById('theme-select');
     const languageSelect = document.getElementById('language-select');
+    const modelSelect = document.getElementById('model-select');
     const resetApiKeyBtn = document.getElementById('reset-api-key');
     const exportMemoryBtn = document.getElementById('export-memory');
+    const importMemoryBtn = document.getElementById('import-memory');
     const clearMemoryBtn = document.getElementById('clear-memory');
     const closeSettingsBtn = document.getElementById('close-settings');
 
@@ -574,20 +633,17 @@ Memory context will be injected before each message in the format:
 
       // Hide splash after animation
       setTimeout(() => {
-        splashScreen.style.display = 'none';
-        if (appState === APP_STATE.ONBOARDING) {
-          onboardingScreen.classList.remove('hidden');
-        } else {
-          app.classList.remove('hidden');
-        }
+        splashScreen.style.opacity = '0';
+        splashScreen.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+          splashScreen.style.display = 'none';
+          if (appState === APP_STATE.ONBOARDING) {
+            onboardingScreen.classList.remove('hidden');
+          } else {
+            app.classList.remove('hidden');
+          }
+        }, 500);
       }, 1500);
-
-      // Register service worker
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
-          console.error('Service Worker registration failed:', err);
-        });
-      }
 
       // Set up event listeners
       setupEventListeners();
@@ -603,9 +659,16 @@ Memory context will be injected before each message in the format:
         preferences: [],
         recentTopics: [],
         conversationHistory: [],
-        customInstructions: ''
+        customInstructions: '',
+        selectedModel: 'openai/gpt-4o-mini'
       };
       conversationHistory = memory.conversationHistory || [];
+      if (memory.selectedModel) {
+        modelSelect.value = memory.selectedModel;
+      }
+      if (memory.preferences && memory.preferences[0]) {
+        languageSelect.value = memory.preferences[0];
+      }
     }
 
     // ======================
@@ -631,7 +694,7 @@ Memory context will be injected before each message in the format:
       attachBtn.addEventListener('click', () => {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/*,.pdf,.txt,.csv,.docx,.doc,.json';
+        input.accept = 'image/*,.pdf,.txt,.csv,.docx,.doc,.json,.js,.py,.html,.css,.md';
         input.addEventListener('change', handleFileSelect);
         input.click();
       });
@@ -646,6 +709,16 @@ Memory context will be injected before each message in the format:
       // End Call Button
       endCallBtn.addEventListener('click', endVoiceCall);
 
+      // Stop Speech Button
+      stopSpeechBtn.addEventListener('click', () => {
+        speechSynthesis.cancel();
+        isSpeaking = false;
+        stopSpeechBtn.classList.add('hidden');
+        if (appState === APP_STATE.VOICE_CALL) {
+          resumeVoiceCallRecognition();
+        }
+      });
+
       // Settings Button
       settingsBtn.addEventListener('click', () => {
         settingsPanel.style.display = 'block';
@@ -658,9 +731,13 @@ Memory context will be injected before each message in the format:
 
       // Reset API Key
       resetApiKeyBtn.addEventListener('click', () => {
-        localStorage.removeItem('iamaihm_api_key');
-        alert('API key reset. Please restart the app.');
-        settingsPanel.style.display = 'none';
+        if (confirm('Are you sure you want to reset the API key?')) {
+          localStorage.removeItem('iamaihm_api_key');
+          settingsPanel.style.display = 'none';
+          app.classList.add('hidden');
+          onboardingScreen.classList.remove('hidden');
+          appState = APP_STATE.ONBOARDING;
+        }
       });
 
       // Export Memory
@@ -673,6 +750,31 @@ Memory context will be injected before each message in the format:
         a.download = 'iamaihm_memory_backup.json';
         a.click();
         URL.revokeObjectURL(url);
+      });
+
+      // Import Memory
+      importMemoryBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const importedMemory = JSON.parse(event.target.result);
+              if (confirm('Importing memory will overwrite current data. Continue?')) {
+                memory = importedMemory;
+                localStorage.setItem('iamaihm_memory', JSON.stringify(memory));
+                location.reload();
+              }
+            } catch (err) {
+              alert('Error parsing memory file.');
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
       });
 
       // Clear Memory
@@ -740,6 +842,14 @@ Memory context will be injected before each message in the format:
         if (speechRecognition) {
           speechRecognition.lang = lang;
         }
+        memory.preferences = [lang];
+        localStorage.setItem('iamaihm_memory', JSON.stringify(memory));
+      });
+
+      // Model Change
+      modelSelect.addEventListener('change', (e) => {
+        memory.selectedModel = e.target.value;
+        localStorage.setItem('iamaihm_memory', JSON.stringify(memory));
       });
     }
 
@@ -798,6 +908,10 @@ Memory context will be injected before each message in the format:
         // Update chat
         typingIndicator.querySelector('.message-content').innerHTML = renderMarkdown(aiMessage);
         conversationHistory.push({ role: 'assistant', content: aiMessage });
+
+        // Update topics
+        updateTopicsHeuristic(message, aiMessage);
+
         memory.conversationHistory = conversationHistory;
         localStorage.setItem('iamaihm_memory', JSON.stringify(memory));
 
@@ -840,6 +954,7 @@ Memory context will be injected before each message in the format:
       const md = window.markdownit({
         html: true,
         linkify: true,
+        breaks: true,
         highlight: function (str, lang) {
           if (lang && hljs.getLanguage(lang)) {
             try {
@@ -850,43 +965,71 @@ Memory context will be injected before each message in the format:
         }
       });
 
-      // Custom rendering for code blocks
-      const defaultRender = md.renderer.rules.code_block || function(tokens, idx, options, env, self) {
-        return self.code_block(tokens, idx, options, env, self);
+      // Custom rendering for fenced code blocks
+      md.renderer.rules.fence = function(tokens, idx, options, env, self) {
+        const token = tokens[idx];
+        const content = token.content;
+        const lang = token.info ? token.info.trim() : '';
+        const highlighted = lang && hljs.getLanguage(lang)
+          ? hljs.highlight(content, { language: lang }).value
+          : md.utils.escapeHtml(content);
+
+        return `<div class="code-block-container">
+          <div class="code-header">
+            <span>${lang || 'code'}</span>
+            <button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>
+          </div>
+          <pre><code class="hljs ${lang}">${highlighted}</code></pre>
+        </div>`;
       };
 
-      md.renderer.rules.code_block = function(tokens, idx, options, env, self) {
-        const content = tokens[idx].content;
-        const lang = tokens[idx].info ? tokens[idx].info.trim() : '';
-        if (lang) {
-          try {
-            const highlighted = hljs.highlight(content, { language: lang }).value;
-            return `<pre><code class="hljs ${lang}">${highlighted}</code></pre>`;
-          } catch (e) {
-            return `<pre><code class="hljs">${md.utils.escapeHtml(content)}</code></pre>`;
-          }
-        }
-        return `<pre><code class="hljs">${md.utils.escapeHtml(content)}</code></pre>`;
-      };
+      // Render math delimiters
+      text = text.replace(/\\\[(.*?)\\\]/gs, (match, p1) => `$$${p1}$$`);
+      text = text.replace(/\\\((.*?)\\\)/gs, (match, p1) => `$${p1}$`);
 
-      // Render math
-      text = text.replace(/\$\$(.*?)\$\$/g, (match, p1) => {
+      // Render KaTeX
+      let html = md.render(text);
+
+      html = html.replace(/\$\$(.*?)\$\$/gs, (match, p1) => {
         try {
-          return katex.renderToString(p1, { throwOnError: false });
-        } catch (e) {
-          return match;
+          return `<div class="math-block">${katex.renderToString(p1, { displayMode: true, throwOnError: false })}</div>`;
+        } catch (e) { return match; }
+      });
+
+      html = html.replace(/\$(.*?)\$/g, (match, p1) => {
+        try {
+          return katex.renderToString(p1, { displayMode: false, throwOnError: false });
+        } catch (e) { return match; }
+      });
+
+      return html;
+    }
+
+    function copyToClipboard(btn) {
+      const code = btn.parentElement.nextElementSibling.innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
+    }
+
+    function updateTopicsHeuristic(userMsg, aiMsg) {
+      const stopWords = new Set(['the', 'and', 'for', 'you', 'can', 'with', 'what', 'how', 'is', 'it', 'to', 'in', 'of', 'a', 'an']);
+      const combined = (userMsg + ' ' + aiMsg).toLowerCase();
+      const words = combined.match(/\b[a-z]{4,}\b/g) || [];
+
+      const counts = {};
+      words.forEach(word => {
+        if (!stopWords.has(word)) {
+          counts[word] = (counts[word] || 0) + 1;
         }
       });
 
-      text = text.replace(/\$(.*?)\$/g, (match, p1) => {
-        try {
-          return katex.renderToString(p1, { throwOnError: false });
-        } catch (e) {
-          return match;
-        }
-      });
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      const newTopics = sorted.slice(0, 3).map(entry => entry[0]);
 
-      return md.render(text);
+      if (!memory.recentTopics) memory.recentTopics = [];
+      memory.recentTopics = [...new Set([...newTopics, ...memory.recentTopics])].slice(0, 10);
     }
 
     // ======================
@@ -949,6 +1092,10 @@ Memory context will be injected before each message in the format:
       if (isSpeaking) {
         speechSynthesis.cancel();
         isSpeaking = false;
+        stopSpeechBtn.classList.add('hidden');
+        if (appState === APP_STATE.VOICE_CALL) {
+          resumeVoiceCallRecognition();
+        }
         return;
       }
 
@@ -959,16 +1106,44 @@ Memory context will be injected before each message in the format:
       utterance.lang = languageSelect.value || 'en-US';
       utterance.onstart = () => {
         isSpeaking = true;
+        stopSpeechBtn.classList.remove('hidden');
+        if (appState === APP_STATE.VOICE_CALL) {
+          pauseVoiceCallRecognition();
+        }
       };
       utterance.onend = () => {
         isSpeaking = false;
+        stopSpeechBtn.classList.add('hidden');
+        if (appState === APP_STATE.VOICE_CALL) {
+          resumeVoiceCallRecognition();
+        }
       };
       utterance.onerror = (event) => {
         console.error('Speech synthesis error:', event);
         isSpeaking = false;
+        stopSpeechBtn.classList.add('hidden');
+        if (appState === APP_STATE.VOICE_CALL) {
+          resumeVoiceCallRecognition();
+        }
       };
 
       speechSynthesis.speak(utterance);
+    }
+
+    function pauseVoiceCallRecognition() {
+      if (speechRecognition && appState === APP_STATE.VOICE_CALL) {
+        speechRecognition.stop();
+      }
+    }
+
+    function resumeVoiceCallRecognition() {
+      if (speechRecognition && appState === APP_STATE.VOICE_CALL && !isSpeaking) {
+        try {
+          speechRecognition.start();
+        } catch (e) {
+          console.error('Failed to restart speech recognition:', e);
+        }
+      }
     }
 
     // ======================
@@ -1082,21 +1257,26 @@ Memory context will be injected before each message in the format:
       const reader = new FileReader();
       reader.onload = async (e) => {
         const content = e.target.result;
-        let message = `User uploaded a file: ${currentFile.name}\n\n`;
+        let displayMessage = `User uploaded a file: ${currentFile.name}\n\n`;
+        let apiContent;
 
         if (currentFile.type.startsWith('image/')) {
-          message += `![${currentFile.name}](${content})`;
-          addMessageToChat('user', message);
-          conversationHistory.push({ role: 'user', content: message });
+          displayMessage += `![${currentFile.name}](${content})`;
+          apiContent = [
+            { type: 'text', text: `User uploaded an image: ${currentFile.name}` },
+            { type: 'image_url', image_url: { url: content } }
+          ];
+          addMessageToChat('user', displayMessage);
+          conversationHistory.push({ role: 'user', content: apiContent, displayContent: displayMessage });
         } else {
           // For text files, extract content
-          if (currentFile.type.startsWith('text/') || currentFile.name.endsWith('.json') || currentFile.name.endsWith('.csv')) {
-            message += content;
+          if (currentFile.type.startsWith('text/') || currentFile.name.endsWith('.json') || currentFile.name.endsWith('.csv') || currentFile.name.endsWith('.js') || currentFile.name.endsWith('.py') || currentFile.name.endsWith('.html') || currentFile.name.endsWith('.css')) {
+            displayMessage += '```\n' + content + '\n```';
           } else {
-            message += `[File: ${currentFile.name} (${formatFileSize(currentFile.size)})]`;
+            displayMessage += `[File: ${currentFile.name} (${formatFileSize(currentFile.size)})]`;
           }
-          addMessageToChat('user', message);
-          conversationHistory.push({ role: 'user', content: message });
+          addMessageToChat('user', displayMessage);
+          conversationHistory.push({ role: 'user', content: displayMessage });
         }
 
         memory.conversationHistory = conversationHistory;
@@ -1150,7 +1330,7 @@ Memory context will be injected before each message in the format:
       const memoryContext = `[MEMORY: Name=${memory.userName || 'User'}, Preferences=${memory.preferences?.join(', ') || 'None'}, Recent topics=${memory.recentTopics?.join(', ') || 'None'}]`;
       const systemMessage = { role: 'system', content: SYSTEM_PROMPT + '\n\n' + memoryContext };
 
-      // Prepare messages for API
+      // Prepare messages for API (handle vision support)
       const apiMessages = [
         systemMessage,
         ...messages.map(msg => ({ role: msg.role, content: msg.content }))
@@ -1164,7 +1344,7 @@ Memory context will be injected before each message in the format:
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'openai/gpt-4o-mini', // or 'anthropic/claude-3-haiku', 'google/gemini-flash-1.5', etc.
+          model: memory.selectedModel || 'openai/gpt-4o-mini',
           messages: apiMessages,
           max_tokens: 4096,
           temperature: 0.7
